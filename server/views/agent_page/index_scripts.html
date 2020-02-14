@@ -1,0 +1,103 @@
+
+<script type="text/javascript">
+jQuery(document).ready(function() {
+    var table = window["datatable"] = jQuery('#datatable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: "{{ urlfor `AgentController.List` }}",
+            data: function(data) {
+                return {
+                    draw: data.draw,
+                    start: data.start,
+                    length: data.length,
+                    q : data.search.value
+                };
+            },
+            dataSrc: "result"
+        },
+        columns : [
+            {
+                data: function(row, type, set, meta) {
+                    var texts = [HtmlEncode(row["hostname"])];
+                    texts.unshift('<a href="javascript:void(0);" title=":title:"><i class="fa fa-circle :online:" aria-hidden="true"></i></a>'
+                        .replace(/:title:/g, row["is_online"] ? "在线" : "离线")
+                        .replace(/:online:/g, row["is_online"] ? "text-success" : "text-danger"));
+                    return texts.join(" ");
+                }
+            },
+            {
+                data: function(row, type, set, meta) {
+                    var texts = '<a href="javascript:void(0);" popover="popover" data-html="true" data-content=":content:">:ip:</a>';
+                    var ip = "";
+                    var content = [];
+                    if(row["ip_list"]) {
+                        jQuery.each(row["ip_list"], function(index, value) {
+                            if(index === 0) {
+                                ip = HtmlEncode(value);
+                            } else {
+                                content.push(HtmlEncode(value));
+                            }
+                        });
+                    }
+                    return texts.replace(/:ip:/, ip).replace(/:content:/g, content.join("<br />"));
+                }
+            },
+            {
+                data: function(row, type, set, meta) {
+                    return HtmlEncode(row["os"]);
+                }
+            },
+            {
+                data: function(row, type, set, meta) {
+                    return HtmlEncode(row["cpu"]) + "核" + "/" + HtmlEncode(FileSize(row["ram"]));
+                }
+            },
+            {
+                data: function(row, type, set, meta) {
+                    var texts = '<a href="javascript:void(0);" popover="popover" data-html="true" data-content=":content:">:disk:</a>';
+                    var disk = "";
+                    var content = [];
+
+                    if(row["disk_list"]) {
+                        var index = 0;
+                        jQuery.each(row["disk_list"], function(key, value) {
+                            var text = ':name:(:value:)'.replace(/:name:/g, key).replace(/:value:/g, FileSize(value));
+                            if(index === 0) {
+                                disk = HtmlEncode(text);
+                            } else {
+                                content.push(HtmlEncode(text));
+                            }
+                            index++;
+
+                        });
+                    }
+                    return texts.replace(/:disk:/, disk).replace(/:content:/g, content.join("<br />"));
+                }
+            },
+            {
+                data: function(row, type, set, meta) {
+                    if (row["create_time"]) {
+                        return jQuery.formatDateTime('yy-mm-dd hh:ii:ss', new Date(row["create_time"]));
+                    }
+                    return "";
+                }
+            },
+            {
+                data: function(row, type, set, meta) {
+                    var buttons = ['<div class="btn-group">'];
+                    buttons.push('<a title="删除" class="btn btn-sm btn-danger btn-control" data-url="{{ urlfor `AgentController.Delete` }}" data-target="datatable" data-title="确认删除?" data-pk=":pk:"><i class="fa fa-trash-o" aria-hidden="true"></i></a>');
+                    buttons.push('</div>');
+                    return buttons.join("").replace(/:pk:/g, row["id"]);
+                }
+            }
+        ]
+    });
+
+    table.on("draw", function() {
+        jQuery('a[title]').tooltip();
+        jQuery('a[popover]').popover({trigger: 'hover'});
+    });
+
+});
+</script>

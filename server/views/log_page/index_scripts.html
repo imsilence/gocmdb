@@ -1,0 +1,111 @@
+{{ define "queryform" }}\
+<form>\
+    <div class="form-group row">\
+        <label class="col-3 col-form-label-sm text-right">终端:</label>\
+        <div class="col-9">\
+            <select class="form-control form-control-sm query"></select>\
+        </div>\
+    </div>\
+</form>\
+{{ end }}
+
+<script type="text/javascript">
+    jQuery(document).ready(function() {
+        var table = window["datatable"] = jQuery('#datatable').DataTable({
+            dom: '<"row"<"col-5"l><"col-2"f><"#buttons.col-4">>t<"row"<"col-6"i><"col-6"p>>',
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "{{ urlfor `LogController.List` }}",
+                data: function(data) {
+                    return {
+                        draw: data.draw,
+                        start: data.start,
+                        length: data.length,
+                        agent : jQuery("select.query").val(),
+                        q : data.search.value
+                    };
+                },
+                dataSrc: "result"
+            },
+            columns : [
+                {
+                    data: function(row, type, set, meta) {
+                        if (row["create_time"]) {
+                            return jQuery.formatDateTime('yy-mm-dd hh:ii:ss', new Date(row["create_time"]));
+                        }
+                        return "";
+                    }
+                },
+                {
+                    data: function(row, type, set, meta) {
+                        return HtmlEncode(row['agent_object']["hostname"] + "(" + row['agent_object']["ip_list"][0] + ")");
+                    }
+                },
+                {
+                    data: function(row, type, set, meta) {
+                        var texts = [];
+                        var indexes = {"load1" : 0, "load5":1, "load15":2};
+                        jQuery.each(row['message_object']["load"], function(key, value) {
+                            texts[indexes[key]] = ":key:(:value:)".replace(/:key:/g, key).replace(/:value:/g, value);
+                        });
+                        return HtmlEncode(texts.join(" / "));
+                    }
+                },
+                {
+                    data: function(row, type, set, meta) {
+                        return HtmlEncode(row['message_object']["cpu_precent"].toFixed(2)) + '%';
+                    }
+                },
+                {
+                    data: function(row, type, set, meta) {
+                        return HtmlEncode(row['message_object']["mem_precent"].toFixed(2)) + '%';
+                    }
+                },
+                {
+                    data: function(row, type, set, meta) {
+                        var texts = [];
+                        jQuery.each(row['message_object']["disk_precent"], function(key, value) {
+                            texts.push(":key:(:value:%)".replace(/:key:/g, key).replace(/:value:/g, value.toFixed(2)));
+                        });
+                        return HtmlEncode(texts.join(" / "));
+                    }
+                }
+            ]
+        });
+
+        table.on("draw", function() {
+            if(!jQuery("#buttons").attr("initd")) {
+                jQuery("#buttons").attr("initd", "initd").html('{{ template `queryform` }}');
+                console.log(jQuery('select.query').length);
+                jQuery('select.query').select2({
+                    ajax: {
+                        url: '{{ urlfor `AgentController.List` }}',
+                        data: function (params) {
+                            return {
+                                q : params.term
+                            };
+                        },
+                        processResults: function (response) {
+                            var results = [
+                                {id:"", text:"全部"}
+                            ];
+                            jQuery.each(response["result"], function(index, value) {
+                                results.push({id: value["uuid"], text: HtmlEncode(value["hostname"] + "(" + value["ip_list"][0] + ")")});
+                            });
+                            return {
+                                results: results
+                            };
+                        }
+                    }
+                });
+            }
+            jQuery('a[title]').tooltip()
+        });
+
+        jQuery(document).on("change", "select.query", function() {
+            table.ajax.reload(null, false);
+            return true;
+        });
+    });
+    </script>
